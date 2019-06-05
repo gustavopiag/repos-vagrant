@@ -1,4 +1,3 @@
-
 $script_mysql = <<-SCRIPT
   apt-get update && \
   apt-get install -y mysql-server-5.7 && \
@@ -8,6 +7,11 @@ SCRIPT
 Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/bionic64"
 
+  config.vm.provider "virtualbox" do |vb|
+  vb.memory = 512
+  vb.cpus = 1
+end
+
   config.vm.define "mysqldb" do |mysql|
     mysql.vm.network "private_network", ip: "192.168.56.25"
     mysql.vm.provision "shell", inline: $script_mysql
@@ -16,16 +20,25 @@ Vagrant.configure("2") do |config|
     mysql.vm.synced_folder "./configs", "/configs"
     mysql.vm.synced_folder ".", "/vagrant", disabled: true
   end
+
   config.vm.define "phpweb" do |phpweb|
     phpweb.vm.network "forwarded_port", guest: 8888, host: 8888
     phpweb.vm.network "private_network", ip: "192.168.56.24"
-    phpweb.vm.provision "shell", inline: "apt-get update && apt-get -y install puppet"
+
+
+    phpweb.vm.provider "virtualbox" do |vb|
+    vb.memory = 1024
+    vb.cpus = 1
+    vb.name= "ubuntu_bionic_php"
+  end
+
+    phpweb.vm.provision "shell",
+      inline: "apt-get update && apt-get -y install puppet"
 
     phpweb.vm.provision "puppet" do |puppet|
       puppet.manifests_path = "./configs/manifests"
       puppet.manifest_file = "phpweb.pp"
     end
-
   end
 
   config.vm.define "mysqlserver" do |mysqlserver|
@@ -34,16 +47,36 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "ansible" do |ansible|
     ansible.vm.network "private_network", ip: "192.168.56.21"
+
     ansible.vm.provision "shell",
       inline: "apt-get update && \
                apt-get install -y software-properties-common && \
                apt-add-repository --yes --update ppa:ansible/ansible && \
                apt install -y ansible"
+  end
 
+  config.vm.define "memcached" do |memcached|
+    memcached.vm.box = "centos/7"
+    memcached.vm.provider "virtualbox" do |vb|
+      vb.memory = 512
+      vb.cpus = 1
+      vb.name= "centos7_memcached"
+    end
+  end
+
+
+  config.vm.define "dockerhost" do |dockerhost|
+    dockerhost.vm.provider "virtualbox" do |vb|
+    vb.memory = 512
+    vb.cpus = 1
+    vb.name= "ubuntu_docker"
+  end
+
+  dockerhost.vm.provision "shell",
+      inline: "apt-get update && apt-get install -y docker.io"
   end
 
 end
-
 ## LINHAS COMENTADAS ##
 #config.vm.network "public_network", ip: "192.168.1.24"
 #config.vm.provision "shell", inline: "cat /configs/id_bionic.pub >> .ssh/authorized_keys"
